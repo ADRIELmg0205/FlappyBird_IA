@@ -3,12 +3,16 @@ import os
 import random
 import neat
 
+# Variável para definir se a IA está jogando
 ai_jogando = True
+# Variável para contar a geração
 geracao = 0
 
+# Definição das dimensões da tela
 TELA_LARGURA = 500
 TELA_ALTURA = 800
 
+# Carregamento das imagens
 IMAGEM_CANO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'pipe.png')))
 IMAGEM_CHAO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'base.png')))
 IMAGEM_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bg.png')))
@@ -21,10 +25,9 @@ IMAGENS_PASSARO = [
 pygame.font.init()
 FONTE_PONTOS = pygame.font.SysFont('arial', 50)
 
-
+# Classe que representa o pássaro
 class Passaro:
     IMGS = IMAGENS_PASSARO
-    # animações da rotação
     ROTACAO_MAXIMA = 25
     VELOCIDADE_ROTACAO = 20
     TEMPO_ANIMACAO = 5
@@ -45,11 +48,11 @@ class Passaro:
         self.altura = self.y
 
     def mover(self):
-        # calcular o deslocamento
+        # Calcular o deslocamento
         self.tempo += 1
         deslocamento = 1.5 * (self.tempo**2) + self.velocidade * self.tempo
 
-        # restringir o deslocamento
+        # Restringir o deslocamento
         if deslocamento > 16:
             deslocamento = 16
         elif deslocamento < 0:
@@ -57,7 +60,7 @@ class Passaro:
 
         self.y += deslocamento
 
-        # o angulo do passaro
+        # Ajustar o ângulo do pássaro
         if deslocamento < 0 or self.y < (self.altura + 50):
             if self.angulo < self.ROTACAO_MAXIMA:
                 self.angulo = self.ROTACAO_MAXIMA
@@ -66,7 +69,7 @@ class Passaro:
                 self.angulo -= self.VELOCIDADE_ROTACAO
 
     def desenhar(self, tela):
-        # definir qual imagem do passaro vai usar
+        # Definir qual imagem do pássaro usar
         self.contagem_imagem += 1
 
         if self.contagem_imagem < self.TEMPO_ANIMACAO:
@@ -81,13 +84,12 @@ class Passaro:
             self.imagem = self.IMGS[0]
             self.contagem_imagem = 0
 
-
-        # se o passaro tiver caindo eu não vou bater asa
+        # Se o pássaro estiver caindo, não bate as asas
         if self.angulo <= -80:
             self.imagem = self.IMGS[1]
             self.contagem_imagem = self.TEMPO_ANIMACAO*2
 
-        # desenhar a imagem
+        # Desenhar a imagem rotacionada do pássaro
         imagem_rotacionada = pygame.transform.rotate(self.imagem, self.angulo)
         pos_centro_imagem = self.imagem.get_rect(topleft=(self.x, self.y)).center
         retangulo = imagem_rotacionada.get_rect(center=pos_centro_imagem)
@@ -96,7 +98,7 @@ class Passaro:
     def get_mask(self):
         return pygame.mask.from_surface(self.imagem)
 
-
+# Classe que representa o cano
 class Cano:
     DISTANCIA = 200
     VELOCIDADE = 5
@@ -139,7 +141,7 @@ class Cano:
         else:
             return False
 
-
+# Classe que representa o chão
 class Chao:
     VELOCIDADE = 5
     LARGURA = IMAGEM_CHAO.get_width()
@@ -163,7 +165,7 @@ class Chao:
         tela.blit(self.IMAGEM, (self.x1, self.y))
         tela.blit(self.IMAGEM, (self.x2, self.y))
 
-
+# Função para desenhar a tela
 def desenhar_tela(tela, passaros, canos, chao, pontos):
     tela.blit(IMAGEM_BACKGROUND, (0, 0))
     for passaro in passaros:
@@ -181,21 +183,23 @@ def desenhar_tela(tela, passaros, canos, chao, pontos):
     chao.desenhar(tela)
     pygame.display.update()
 
-
+# Função principal que será usada pelo NEAT para evoluir as redes neurais
 def main(genomas, config): # fitness function
     global geracao
     geracao += 1
 
     if ai_jogando:
+        # Listas para armazenar as redes, genomas e pássaros
         redes = []
         lista_genomas = []
         passaros = []
         for _, genoma in genomas:
+            # Cria a rede neural para o genoma atual
             rede = neat.nn.FeedForwardNetwork.create(genoma, config)
             redes.append(rede)
-            genoma.fitness = 0
+            genoma.fitness = 0  # Inicializa o fitness do genoma
             lista_genomas.append(genoma)
-            passaros.append(Passaro(230, 350))
+            passaros.append(Passaro(230, 350))  # Cria um pássaro para cada genoma
     else:
         passaros = [Passaro(230, 350)]
     chao = Chao(730)
@@ -208,7 +212,7 @@ def main(genomas, config): # fitness function
     while rodando:
         relogio.tick(30)
 
-        # interação com o usuário
+        # Interação com o usuário
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 rodando = False
@@ -228,15 +232,16 @@ def main(genomas, config): # fitness function
             rodando = False
             break
 
-        # mover as coisas
+        # Mover as coisas
         for i, passaro in enumerate(passaros):
             passaro.mover()
-            # aumentar um pouquinho a fitness do passaro
+            # Aumentar um pouco a fitness do pássaro
             lista_genomas[i].fitness += 0.1
+            # Usar a rede neural para decidir se o pássaro deve pular
             output = redes[i].activate((passaro.y,
                                         abs(passaro.y - canos[indice_cano].altura),
                                         abs(passaro.y - canos[indice_cano].pos_base)))
-            # -1 e 1 -> se o output for > 0.5 então o passaro pula
+            # Se o output for > 0.5, o pássaro pula
             if output[0] > 0.5:
                 passaro.pular()
         chao.mover()
@@ -275,24 +280,28 @@ def main(genomas, config): # fitness function
 
         desenhar_tela(tela, passaros, canos, chao, pontos)
 
-
+# Função para rodar o NEAT
 def rodar(caminho_config):
+    # Carregar as configurações do NEAT
     config = neat.config.Config(neat.DefaultGenome,
                                 neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet,
                                 neat.DefaultStagnation,
                                 caminho_config)
 
+    # Criar a população
     populacao = neat.Population(config)
+    # Adicionar repórteres para exibir informações na tela
     populacao.add_reporter(neat.StdOutReporter(True))
     populacao.add_reporter(neat.StatisticsReporter())
 
+    # Rodar a simulação
     if ai_jogando:
         populacao.run(main, 50)
     else:
         main(None, None)
 
-
+# Executar o jogo
 if __name__ == '__main__':
     caminho = os.path.dirname(__file__)
     caminho_config = os.path.join(caminho, 'config.txt')
